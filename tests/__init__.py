@@ -51,6 +51,6 @@ def create_module() -> SynapseLimitUserDirectory:
     module_api = Mock(spec=ModuleApi)
 
     # If necessary, give parse_config some configuration to parse.
-    config = SynapseLimitUserDirectory.parse_config({})
+    config = SynapseLimitUserDirectory.parse_config([{}])
 
     return SynapseLimitUserDirectory(config, module_api)

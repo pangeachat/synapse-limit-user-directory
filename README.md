@@ -2,12 +2,15 @@
 
 Limit user directory from returning users <18 years 
 
+## Usage
+
+`pip install 
 
 ## Installation
 
 From the virtual environment that you use for Synapse, install this module with:
 ```shell
-pip install path/to/synapse-limit-user-directory
+pip install https://github.com/pangeachat/synapse-limit-user-directory
 ```
 (If you run into issues, you may need to upgrade `pip` first, e.g. by running
 `pip install --upgrade pip`)
@@ -17,7 +20,8 @@ Then alter your homeserver configuration, adding to your `modules` configuration
 modules:
   - module: synapse_limit_user_directory.SynapseLimitUserDirectory
     config:
-      # TODO: Complete this section with an example for your module
+      dob_search_path: global_data.profile.user_settings.date_of_birth
+      filter_if_missing_dob: false
 ```
 
 
