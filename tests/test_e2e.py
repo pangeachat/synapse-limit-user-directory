@@ -26,7 +26,7 @@ class TestE2E(aiounittest.AsyncTestCase):
     async def start_test_synapse(
         self,
         postgresql_url: Union[str, None] = None,
-    ) -> Tuple[str, str, subprocess.Popen[str], threading.Thread, threading.Thread]:
+    ) -> Tuple[str, str, subprocess.Popen, threading.Thread, threading.Thread]:
         try:
             synapse_dir = tempfile.mkdtemp()
 
