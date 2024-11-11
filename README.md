@@ -20,8 +20,13 @@ Then alter your homeserver configuration, adding to your `modules` configuration
 modules:
   - module: synapse_limit_user_directory.SynapseLimitUserDirectory
     config:
-      dob_search_path: global_data.profile.user_settings.date_of_birth
-      filter_if_missing_dob: false
+      dob_search_path: profile.user_settings.date_of_birth
+      # Optional with defaults
+      # filter_if_missing_dob: false
+      # dob_strptime_formats:
+      #    - %Y-%m-%dT%H:%M:%S.%f
+      #    - %Y-%m-%dT%H:%M:%S
+      #    - %Y-%m-%d
 ```
 
 

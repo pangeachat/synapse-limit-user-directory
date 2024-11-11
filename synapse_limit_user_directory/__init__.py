@@ -1,6 +1,6 @@
 import logging
 import re
-from datetime import date, datetime
+from datetime import datetime
 from typing import Any, Dict, List
 
 import attr
@@ -83,9 +83,9 @@ class SynapseLimitUserDirectory:
         if not isinstance(global_data, str):
             return self._config.filter_if_missing_dob
 
-        dob_str = global_data
+        dob_str: str = global_data
 
-        dob = None
+        dob: None | datetime = None
         for fmt in self._config.dob_strptime_formats:
             try:
                 dob = datetime.strptime(dob_str, fmt)

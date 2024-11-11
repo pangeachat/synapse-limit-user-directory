@@ -52,7 +52,6 @@ class TestE2E(aiounittest.AsyncTestCase):
                     "module": "synapse_limit_user_directory.SynapseLimitUserDirectory",
                     "config": {
                         "dob_search_path": "profile.user_settings.date_of_birth",
-                        "filter_if_missing_dob": False,
                     },
                 }
             ]

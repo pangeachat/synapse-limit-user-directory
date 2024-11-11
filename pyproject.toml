@@ -3,10 +3,10 @@ name = "synapse_limit_user_directory"
 description = "Limit user directory from returning users <18 years "
 readme = "README.md"
 
-version = "0.0.0"
+version = "0.0.1"
 
 
-requires-python = ">=3.8"
+requires-python = ">=3.8,<3.13"
 
 classifiers = [
   "License :: OSI Approved :: Apache Software License"
@@ -38,10 +38,12 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [tool.mypy]
+files = ["synapse_limit_user_directory", "tests"]
 strict = true
+disable_error_code = ["import-untyped", "no-untyped-call", "attr-defined"]
 
 [tool.ruff]
-line-length = 88
+line-length = 80
 
 # See https://docs.astral.sh/ruff/rules/#error-e
 # for error codes. The ones we ignore are:
