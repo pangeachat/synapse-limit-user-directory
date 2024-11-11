@@ -98,4 +98,4 @@ class SynapseLimitUserDirectory:
 
         # If today is past the threshold then the user is over 18 and OK to
         # return, which is equivalent to returning False.
-        return datetime.today() <= dob.replace(year=dob.year + 18)
+        return datetime.today() < dob.replace(year=dob.year + 18)
