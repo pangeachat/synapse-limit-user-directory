@@ -7,3 +7,5 @@ _trial_temp
 __pycache__
 /dist
 /build
+.vscode
+*.log*

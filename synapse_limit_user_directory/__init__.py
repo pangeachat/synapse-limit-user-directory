@@ -1,7 +1,7 @@
-from datetime import date, datetime
 import logging
 import re
-from typing import Any, Dict
+from datetime import date, datetime
+from typing import Any, Dict, List
 
 import attr
 from synapse.module_api import ModuleApi, UserProfile
@@ -10,8 +10,8 @@ from synapse.module_api import ModuleApi, UserProfile
 @attr.s(auto_attribs=True, frozen=True)
 class SynapseLimitUserDirectoryConfig:
     dob_search_path: str
-    filter_if_missing_dob: bool = False
-    dob_strptime_format: str = "%Y-%m-%dT%H:%M:%S.%f"
+    filter_if_missing_dob: bool
+    dob_strptime_formats: List[str]
 
 
 logger = logging.getLogger("synapse.modules.synapse_limit_user_directory")
@@ -33,21 +33,28 @@ class SynapseLimitUserDirectory:
         dob_search_path = config.get("dob_search_path")
         if not isinstance(dob_search_path, str):
             raise ValueError('Config "dob_search_path" must be a string')
-        # verify it's dot-syntax (i.e. foo.bar.foobar) and must starts with "global_data."
-        if not dob_search_path.startswith("global_data."):
-            raise ValueError('Config "dob_search_path" must start with "global_data."')
+        # verify it's dot-syntax (i.e. foo.bar.foobar)
         if re.match(r"^[a-z0-9_]+(\.[a-z0-9_]+)*$", dob_search_path) is None:
             raise ValueError(
-                'Config "dob_search_path" must be in dot-syntax (i.e. global_data.profile.user_settings.date_of_birth)'
+                'Config "dob_search_path" must be in dot-syntax (i.e. profile.user_settings.date_of_birth)'
             )
 
         filter_if_missing_dob = config.get("filter_if_missing_dob", True)
-        dob_strptime_format = config.get("dob_strptime_format")
+        if filter_if_missing_dob is None:
+            filter_if_missing_dob = False
+
+        dob_strptime_formats = config.get("dob_strptime_format")
+        if dob_strptime_formats is None:
+            dob_strptime_formats = [
+                "%Y-%m-%dT%H:%M:%S.%f",
+                "%Y-%m-%dT%H:%M:%S",
+                "%Y-%m-%d",
+            ]
 
         return SynapseLimitUserDirectoryConfig(
             dob_search_path=dob_search_path,
             filter_if_missing_dob=filter_if_missing_dob,
-            dob_strptime_format=dob_strptime_format,
+            dob_strptime_formats=dob_strptime_formats,
         )
 
     async def check_username_for_spam(self, user_profile: UserProfile) -> bool:
@@ -70,20 +77,25 @@ class SynapseLimitUserDirectory:
         if global_data is None:
             return self._config.filter_if_missing_dob
         for path in dob_search_paths[1:]:
-            dob_str = global_data.get(path, None)
-            if dob_str is None:
+            global_data = global_data.get(path, None)
+            if global_data is None:
                 return self._config.filter_if_missing_dob
-        if not isinstance(dob_str, str):
+        if not isinstance(global_data, str):
             return self._config.filter_if_missing_dob
-        try:
-            # Attempt to parse the date string using the user-defined format
-            dob = datetime.strptime(dob_str, self._config.dob_strptime_format)
-        except ValueError:
-            # Raise a custom error if parsing fails
+
+        dob_str = global_data
+
+        dob = None
+        for fmt in self._config.dob_strptime_formats:
+            try:
+                dob = datetime.strptime(dob_str, fmt)
+            except ValueError:
+                pass
+        if dob is None:
             raise ValueError(
-                f"The date string '{dob_str}' does not match the format '{self._config.dob_strptime_format}'."
+                f"Date '{dob_str}' does not match any known formats: {', '.join(self._config.dob_strptime_formats)}."
             )
 
-        # If today is past the threshold then the user is 18+ and OK to return,
-        # which is equivalent to returning False.
-        return date.today() < dob.replace(year=dob.year + 18)
+        # If today is past the threshold then the user is over 18 and OK to
+        # return, which is equivalent to returning False.
+        return datetime.today() <= dob.replace(year=dob.year + 18)

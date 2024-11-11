@@ -21,7 +21,7 @@ dev = [
   # for tests
   "matrix-synapse",
   "tox",
-  "twisted",
+  "twisted == 24.7.0",
   "aiounittest",
   # for type checking
   "mypy == 1.6.1",
