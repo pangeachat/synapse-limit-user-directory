@@ -1,4 +1,4 @@
-def main():
+def main() -> None:
     import argparse
     from importlib.metadata import PackageNotFoundError, version
 

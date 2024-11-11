@@ -26,7 +26,7 @@ class TestE2E(aiounittest.AsyncTestCase):
     async def start_test_synapse(
         self,
         postgresql_url: Union[str, None] = None,
-    ) -> Tuple[str, str, subprocess.Popen, threading.Thread, threading.Thread]:
+    ) -> Tuple[str, str, subprocess.Popen[str], threading.Thread, threading.Thread]:
         try:
             synapse_dir = tempfile.mkdtemp()
 
@@ -96,7 +96,7 @@ class TestE2E(aiounittest.AsyncTestCase):
             )
 
             # Start threads to read stdout and stderr concurrently
-            def read_output(pipe: Union[IO[str], None]):
+            def read_output(pipe: Union[IO[str], None]) -> None:
                 if pipe is None:
                     return
                 for line in iter(pipe.readline, ""):
@@ -247,9 +247,9 @@ class TestE2E(aiounittest.AsyncTestCase):
             headers={"Authorization": f"Bearer {access_token}"},
         )
         self.assertEqual(response.status_code, 200)
-        dob = await self.get_dob_of_user(user_id, access_token)
+        user_dob = await self.get_dob_of_user(user_id, access_token)
         self.assertEqual(
-            dob,
+            user_dob,
             datetime.strptime(
                 update_json["user_settings"]["date_of_birth"], "%Y-%m-%dT%H:%M:%S"
             ),
