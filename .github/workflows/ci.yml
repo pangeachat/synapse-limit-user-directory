@@ -23,7 +23,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
         with:
-        python_version: [ "3.8", "3.9", "3.10", "3.11", "3.12" ]
+          python-version: "3.x"
       - run: python -m pip install tox
       - run: tox -e check_types
 
@@ -34,7 +34,7 @@ jobs:
       matrix:
         # Run the unit tests both against our oldest supported Python version
         # and the newest stable.
-        python_version: [ "3.8", "3.x" ]
+        python_version: [ "3.8", "3.9", "3.10", "3.11", "3.12" ]
     steps: 
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v4
