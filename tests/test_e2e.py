@@ -202,7 +202,9 @@ class TestE2E(aiounittest.AsyncTestCase):
             users.append(user_id)
         return users
 
-    async def get_dob_of_user(self, user_id: str, access_token: str) -> datetime | None:
+    async def get_dob_of_user(
+        self, user_id: str, access_token: str
+    ) -> Union[datetime, None]:
         response = requests.get(
             f"http://localhost:8008/_matrix/client/v3/user/{user_id}/account_data/profile",
             headers={"Authorization": f"Bearer {access_token}"},
@@ -262,7 +264,7 @@ class TestE2E(aiounittest.AsyncTestCase):
         ]
         subprocess.check_call(version_cmd)
 
-    async def test_limit_user_directory(self):
+    async def test_limit_user_directory(self) -> None:
         synapse_dir = None
         server_process = None
         stdout_thread = None
