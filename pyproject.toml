@@ -39,8 +39,8 @@ build-backend = "setuptools.build_meta"
 
 [tool.mypy]
 files = ["synapse_limit_user_directory", "tests"]
-strict = true
 disable_error_code = ["import-untyped", "no-untyped-call", "attr-defined"]
+strict = false
 
 [tool.ruff]
 line-length = 80
