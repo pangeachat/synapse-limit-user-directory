@@ -52,9 +52,15 @@ class TestE2E(aiounittest.AsyncTestCase):
                     "module": "synapse_limit_user_directory.SynapseLimitUserDirectory",
                     "config": {
                         "dob_search_path": "profile.user_settings.date_of_birth",
+                        "whitelist_requester_id_patterns": [
+                            "@whitelisted:my.domain.name"
+                        ],
                     },
                 }
             ]
+            config["rc_login"] = {
+                "address": {"per_second": 9999, "burst_count": 9999},
+            }
 
             config["database"] = {
                 "name": "sqlite3",
@@ -306,6 +312,16 @@ class TestE2E(aiounittest.AsyncTestCase):
                     user_index = int(user[5])  # @user0, @user1, @user2, ...
                     dob = await self.get_dob_of_user(user, creds[user_index][1])
                     self.assertEqual(dob, over_eighteen)
+
+            # Register whitelisted user
+            await self.register_user(
+                config_path, synapse_dir, "whitelisted", "password", True
+            )
+            (whitelisted_username, whitelisted_access_token) = await self.login_user(
+                "whitelisted", "password"
+            )
+            users = await self.search_users("user", whitelisted_access_token)
+            self.assertEqual(len(users), 5)
 
             # Clean up
             if server_process is not None:

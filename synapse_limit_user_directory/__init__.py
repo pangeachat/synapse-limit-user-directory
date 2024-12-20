@@ -12,6 +12,7 @@ class SynapseLimitUserDirectoryConfig:
     dob_search_path: str
     filter_if_missing_dob: bool
     dob_strptime_formats: List[str]
+    whitelist_requester_id_patterns: list[str]
 
 
 logger = logging.getLogger("synapse.modules.synapse_limit_user_directory")
@@ -51,18 +52,42 @@ class SynapseLimitUserDirectory:
                 "%Y-%m-%d",
             ]
 
+        whitelist_requester_id_patterns = config.get(
+            "whitelist_requester_id_patterns", []
+        )
+        if not isinstance(whitelist_requester_id_patterns, list):
+            raise ValueError('Config "whitelist_requester_id_patterns" must be a list')
+        for pattern in whitelist_requester_id_patterns:
+            if not isinstance(pattern, str):
+                raise ValueError(
+                    'Config "whitelist_requester_id_patterns" must be a list of strings'
+                )
+
         return SynapseLimitUserDirectoryConfig(
             dob_search_path=dob_search_path,
             filter_if_missing_dob=filter_if_missing_dob,
             dob_strptime_formats=dob_strptime_formats,
+            whitelist_requester_id_patterns=whitelist_requester_id_patterns,
         )
 
-    async def check_username_for_spam(self, user_profile: UserProfile) -> bool:
+    async def check_username_for_spam(
+        self, user_profile: UserProfile, requester_id: str
+    ) -> bool:
         """
         Decide whether to filter a user from the user directory results.
 
+        :param user_profile: The user profile to check.
+        :param requester_id: The user ID of the requester, in @<username>:<server> format.
+
         # Return true to *exclude* the user from the results.
         """
+        # Bypass the filter if the username matches the whitelist pattern.
+        for pattern in self._config.whitelist_requester_id_patterns:
+            print(f"Checking {requester_id} against {pattern}")
+            if re.match(pattern, requester_id):
+                print(f"Matched {requester_id} against {pattern}")
+                return False
+
         user_id = user_profile["user_id"]
 
         # For remote users, nothing to do.

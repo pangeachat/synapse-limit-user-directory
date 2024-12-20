@@ -1,6 +1,6 @@
 # synapse limit user directory
 
-Limit user directory from returning users <18 years 
+Limit user directory from returning users <18 years old
 
 ## Usage
 
