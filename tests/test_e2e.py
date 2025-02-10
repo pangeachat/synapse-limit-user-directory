@@ -51,7 +51,7 @@ class TestE2E(aiounittest.AsyncTestCase):
                 {
                     "module": "synapse_limit_user_directory.SynapseLimitUserDirectory",
                     "config": {
-                        "dob_search_path": "profile.user_settings.date_of_birth",
+                        "public_attribute_search_path": "profile.user_settings.public",
                         "whitelist_requester_id_patterns": [
                             "@whitelisted:my.domain.name"
                         ],
@@ -208,9 +208,9 @@ class TestE2E(aiounittest.AsyncTestCase):
             users.append(user_id)
         return users
 
-    async def get_dob_of_user(
+    async def get_public_attribute_of_user(
         self, user_id: str, access_token: str
-    ) -> Union[datetime, None]:
+    ) -> Union[bool, None]:
         response = requests.get(
             f"http://localhost:8008/_matrix/client/v3/user/{user_id}/account_data/profile",
             headers={"Authorization": f"Bearer {access_token}"},
@@ -221,14 +221,15 @@ class TestE2E(aiounittest.AsyncTestCase):
         self.assertIsInstance(response_json, dict)
         user_settings = response_json.get("user_settings", {})
         self.assertIsInstance(user_settings, dict)
-        dob_str = user_settings.get("date_of_birth", None)
-        if dob_str is None:
+        is_public = user_settings.get("public", None)
+        if is_public is None:
             return None
-        dob = datetime.strptime(dob_str, "%Y-%m-%dT%H:%M:%S")
-        return dob
+        if isinstance(is_public, str):
+            is_public = is_public.lower() == "true"
+        return is_public
 
-    async def set_dob_of_user(
-        self, user_id: str, dob: datetime, access_token: str
+    async def set_public_attribute_of_user(
+        self, user_id: str, public_attribute: bool, access_token: str
     ) -> None:
         response = requests.get(
             f"http://localhost:8008/_matrix/client/v3/user/{user_id}/account_data/profile",
@@ -244,22 +245,17 @@ class TestE2E(aiounittest.AsyncTestCase):
         update_json = response_json.copy()
         if "user_settings" not in update_json:
             update_json["user_settings"] = {}
-        update_json["user_settings"]["date_of_birth"] = dob.strftime(
-            "%Y-%m-%dT%H:%M:%S"
-        )
+        update_json["user_settings"]["public"] = public_attribute
         response = requests.put(
             f"http://localhost:8008/_matrix/client/v3/user/{user_id}/account_data/profile",
             json=update_json,
             headers={"Authorization": f"Bearer {access_token}"},
         )
         self.assertEqual(response.status_code, 200)
-        user_dob = await self.get_dob_of_user(user_id, access_token)
-        self.assertEqual(
-            user_dob,
-            datetime.strptime(
-                update_json["user_settings"]["date_of_birth"], "%Y-%m-%dT%H:%M:%S"
-            ),
+        user_public_attribute = await self.get_public_attribute_of_user(
+            user_id, access_token
         )
+        self.assertEqual(user_public_attribute, public_attribute)
 
     def assert_mounted_module(self) -> None:
         version_cmd = [
@@ -287,7 +283,7 @@ class TestE2E(aiounittest.AsyncTestCase):
             self.assert_mounted_module()
 
             creds: List[Tuple[str, str]] = []
-            for i in range(5):
+            for i in range(6):
                 await self.register_user(
                     config_path, synapse_dir, f"user{i}", f"password{i}", False
                 )
@@ -296,22 +292,33 @@ class TestE2E(aiounittest.AsyncTestCase):
                 )
                 creds.append((username, access_token))
 
-            now = datetime.now()
-            under_eighteen = now.replace(year=now.year - 17, microsecond=0)
-            over_eighteen = now.replace(year=now.year - 19, microsecond=0)
-            for i in range(5):
-                if i % 2 == 0:
-                    await self.set_dob_of_user(creds[i][0], under_eighteen, creds[i][1])
-                else:
-                    await self.set_dob_of_user(creds[i][0], over_eighteen, creds[i][1])
+            for i in range(6):
+                if i == 0 or i == 1:
+                    # User 0, 1: private
+                    await self.set_public_attribute_of_user(
+                        creds[i][0], False, creds[i][1]
+                    )
+                elif i == 2 or i == 3:
+                    # User 2, 3: public
+                    await self.set_public_attribute_of_user(
+                        creds[i][0], True, creds[i][1]
+                    )
+                elif i == 4 or i == 5:
+                    # User 4, 5: not set
+                    ...
 
-            for i in range(5):
+            for i in range(6):
+                # all users should only see public users
                 (username, access_token) = creds[i]
                 users = await self.search_users("user", access_token)
                 for user in users:
-                    user_index = int(user[5])  # @user0, @user1, @user2, ...
-                    dob = await self.get_dob_of_user(user, creds[user_index][1])
-                    self.assertEqual(dob, over_eighteen)
+                    other_user_index = int(user[5])  # @user0, @user1, @user2, ...
+                    self.assertIn(other_user_index, [2, 3])
+
+                    user_is_public = await self.get_public_attribute_of_user(
+                        user, creds[other_user_index][1]
+                    )
+                    self.assertEqual(user_is_public, True)
 
             # Register whitelisted user
             await self.register_user(
@@ -321,7 +328,7 @@ class TestE2E(aiounittest.AsyncTestCase):
                 "whitelisted", "password"
             )
             users = await self.search_users("user", whitelisted_access_token)
-            self.assertEqual(len(users), 5)
+            self.assertEqual(len(users), 6)
 
             # Clean up
             if server_process is not None:
