@@ -19,7 +19,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
   # for tests
-  "matrix-synapse @ git+https://github.com/element-hq/synapse.git@d69c00b5a19ba45645665afa532421b25c74407a",
+  "matrix-synapse == 1.123.0",
   "tox",
   "twisted == 24.7.0",
   "aiounittest",

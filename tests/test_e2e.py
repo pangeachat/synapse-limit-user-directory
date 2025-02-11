@@ -6,7 +6,6 @@ import subprocess
 import sys
 import tempfile
 import threading
-from datetime import datetime
 from typing import IO, List, Tuple, Union
 
 import aiounittest
