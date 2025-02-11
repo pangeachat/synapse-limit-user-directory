@@ -97,9 +97,12 @@ class SynapseLimitUserDirectory:
             global_data = global_data.get(path, None)
             if global_data is None:
                 return True
-        if not isinstance(global_data, str):
-            return True
+        if isinstance(global_data, str):
+            is_public = global_data.lower() == "true"
+            return not is_public
+        elif isinstance(global_data, bool):
+            return not global_data
 
-        is_public = global_data.lower() == "true"
-
-        return not is_public
+        # Should be unreachable, so we log a warning and exclude the user
+        logger.warning(f"Unexpected type for public attribute: {type(global_data)}")
+        return True
