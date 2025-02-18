@@ -405,10 +405,14 @@ class TestE2E(aiounittest.AsyncTestCase):
         stdout_thread = None
         stderr_thread = None
         try:
-            (synapse_dir, config_path, server_process, stdout_thread, stderr_thread) = (
-                await self.start_test_synapse(
-                    filter_search_if_missing_public_attribute=False
-                )
+            (
+                synapse_dir,
+                config_path,
+                server_process,
+                stdout_thread,
+                stderr_thread,
+            ) = await self.start_test_synapse(
+                filter_search_if_missing_public_attribute=False
             )
 
             # Register two users: one with missing attribute and one explicitly public.
@@ -470,9 +474,13 @@ class TestE2E(aiounittest.AsyncTestCase):
         stdout_thread = None
         stderr_thread = None
         try:
-            (synapse_dir, config_path, server_process, stdout_thread, stderr_thread) = (
-                await self.start_test_synapse()
-            )
+            (
+                synapse_dir,
+                config_path,
+                server_process,
+                stdout_thread,
+                stderr_thread,
+            ) = await self.start_test_synapse()
 
             # Register and login a user.
             await self.register_user(
