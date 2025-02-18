@@ -21,6 +21,7 @@ modules:
   - module: synapse_limit_user_directory.SynapseLimitUserDirectory
     config:
       public_attribute_search_path: profile.user_settings.public
+      filter_search_if_missing_public_attribute: true
       whitelist_requester_id_patterns:
         - '^@admin:example.com$'
 ```

@@ -10,6 +10,7 @@ from synapse.module_api import ModuleApi, UserProfile
 class SynapseLimitUserDirectoryConfig:
     public_attribute_search_path: str
     whitelist_requester_id_patterns: list[str]
+    filter_search_if_missing_public_attribute: bool = True
 
 
 logger = logging.getLogger("synapse.modules.synapse_limit_user_directory")
@@ -23,6 +24,8 @@ class SynapseLimitUserDirectory:
         self._api.register_spam_checker_callbacks(
             check_username_for_spam=self.check_username_for_spam,
         )
+        self._datastores = self._api._hs.get_datastores()
+        self.room_store = self._datastores.main
 
     @staticmethod
     def parse_config(config: Dict[str, Any]) -> SynapseLimitUserDirectoryConfig:
@@ -52,9 +55,19 @@ class SynapseLimitUserDirectory:
                     'Config "whitelist_requester_id_patterns" must be a list of strings'
                 )
 
+        # New config option; defaults to True if not provided.
+        filter_search_if_missing_public_attribute = config.get(
+            "filter_search_if_missing_public_attribute", True
+        )
+        if not isinstance(filter_search_if_missing_public_attribute, bool):
+            raise ValueError(
+                'Config "filter_search_if_missing_public_attribute" must be a boolean'
+            )
+
         return SynapseLimitUserDirectoryConfig(
             public_attribute_search_path=public_attribute_search_path,
             whitelist_requester_id_patterns=whitelist_requester_id_patterns,
+            filter_search_if_missing_public_attribute=filter_search_if_missing_public_attribute,
         )
 
     async def check_username_for_spam(
@@ -92,17 +105,38 @@ class SynapseLimitUserDirectory:
             user_id, public_attribute_search_path[0]
         )
         if global_data is None:
-            return True
+            return self._config.filter_search_if_missing_public_attribute
+
         for path in public_attribute_search_path[1:]:
             global_data = global_data.get(path, None)
             if global_data is None:
-                return True
+                return self._config.filter_search_if_missing_public_attribute
         if isinstance(global_data, str):
             is_public = global_data.lower() == "true"
-            return not is_public
         elif isinstance(global_data, bool):
-            return not global_data
+            is_public = global_data
+        else:
+            # Should be unreachable, so we log a warning and exclude the user
+            logger.warning(f"Unexpected type for public attribute: {type(global_data)}")
+            is_public = False
 
-        # Should be unreachable, so we log a warning and exclude the user
-        logger.warning(f"Unexpected type for public attribute: {type(global_data)}")
+        if is_public:
+            return False
+
+        # search if requester shares a room with the requestee
+        query = """
+            SELECT room_id FROM users_who_share_private_rooms
+            WHERE user_id = ? AND other_user_id = ?
+        """
+        params = (requester_id, user_id)
+        rows = await self.room_store.db_pool.execute(
+            "get_shared_rooms",
+            query,
+            *params,
+        )
+        # if any shared room exists then allow the user (do not filter)
+        if len(rows) > 0:
+            return False
+
+        # otherwise filter the user since they do not share any room with the requester
         return True

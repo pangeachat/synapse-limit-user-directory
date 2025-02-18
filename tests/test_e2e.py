@@ -23,8 +23,7 @@ logging.basicConfig(
 
 class TestE2E(aiounittest.AsyncTestCase):
     async def start_test_synapse(
-        self,
-        postgresql_url: Union[str, None] = None,
+        self, filter_search_if_missing_public_attribute: bool = True
     ) -> Tuple[str, str, subprocess.Popen, threading.Thread, threading.Thread]:
         try:
             synapse_dir = tempfile.mkdtemp()
@@ -54,6 +53,7 @@ class TestE2E(aiounittest.AsyncTestCase):
                         "whitelist_requester_id_patterns": [
                             "@whitelisted:my.domain.name"
                         ],
+                        "filter_search_if_missing_public_attribute": filter_search_if_missing_public_attribute,
                     },
                 }
             ]
@@ -307,9 +307,10 @@ class TestE2E(aiounittest.AsyncTestCase):
                     ...
 
             for i in range(6):
-                # all users should only see public users
                 (username, access_token) = creds[i]
                 users = await self.search_users("user", access_token)
+                # Expect that the search results do not include the searcher's own ID.
+                self.assertNotIn(username, users)
                 for user in users:
                     other_user_index = int(user[5])  # @user0, @user1, @user2, ...
                     self.assertIn(other_user_index, [2, 3])
@@ -328,6 +329,53 @@ class TestE2E(aiounittest.AsyncTestCase):
             )
             users = await self.search_users("user", whitelisted_access_token)
             self.assertEqual(len(users), 6)
+
+            # Shared room overrides private profile filtering.
+            await self.register_user(
+                config_path, synapse_dir, "userA", "passwordA", False
+            )
+            await self.register_user(
+                config_path, synapse_dir, "userB", "passwordB", False
+            )
+            (userA, tokenA) = await self.login_user("userA", "passwordA")
+            (userB, tokenB) = await self.login_user("userB", "passwordB")
+            # Ensure both users have private profiles.
+            await self.set_public_attribute_of_user(userA, False, tokenA)
+            await self.set_public_attribute_of_user(userB, False, tokenB)
+
+            # userA creates a private direct room.
+            create_room_url = "http://localhost:8008/_matrix/client/v3/createRoom"
+            create_room_payload = {"preset": "private_chat", "is_direct": True}
+            response = requests.post(
+                create_room_url,
+                headers={"Authorization": f"Bearer {tokenA}"},
+                json=create_room_payload,
+            )
+            self.assertEqual(response.status_code, 200)
+            room_id = response.json()["room_id"]
+
+            # userA invites userB.
+            invite_url = (
+                f"http://localhost:8008/_matrix/client/v3/rooms/{room_id}/invite"
+            )
+            invite_payload = {"user_id": userB}
+            response = requests.post(
+                invite_url,
+                headers={"Authorization": f"Bearer {tokenA}"},
+                json=invite_payload,
+            )
+            self.assertEqual(response.status_code, 200)
+
+            # userB joins the room.
+            join_url = f"http://localhost:8008/_matrix/client/v3/join/{room_id}"
+            response = requests.post(
+                join_url, headers={"Authorization": f"Bearer {tokenB}"}
+            )
+            self.assertEqual(response.status_code, 200)
+
+            # Search for userB as userA; shared room should allow userB to appear in the results.
+            users = await self.search_users("userB", tokenA)
+            self.assertIn(userB, users)
 
             # Clean up
             if server_process is not None:
@@ -348,5 +396,119 @@ class TestE2E(aiounittest.AsyncTestCase):
             if stderr_thread is not None:
                 stderr_thread.join()
             if synapse_dir is not None:
+                shutil.rmtree(synapse_dir)
+            raise e
+
+    async def test_missing_public_attribute_filtering(self) -> None:
+        synapse_dir = None
+        server_process = None
+        stdout_thread = None
+        stderr_thread = None
+        try:
+            (synapse_dir, config_path, server_process, stdout_thread, stderr_thread) = (
+                await self.start_test_synapse(
+                    filter_search_if_missing_public_attribute=False
+                )
+            )
+
+            # Register two users: one with missing attribute and one explicitly public.
+            await self.register_user(
+                config_path, synapse_dir, "filterUser", "passwordF", False
+            )
+            await self.register_user(
+                config_path, synapse_dir, "publicUser", "passwordP", False
+            )
+            (filterUser, tokenF) = await self.login_user("filterUser", "passwordF")
+            (publicUser, tokenP) = await self.login_user("publicUser", "passwordP")
+
+            # Set public attribute only for publicUser.
+            await self.set_public_attribute_of_user(publicUser, True, tokenP)
+            # Do not set for filterUser so its public attribute remains missing.
+
+            # Register an extra user to perform the search.
+            await self.register_user(
+                config_path, synapse_dir, "searcher", "passwordS", False
+            )
+            (searcher, tokenS) = await self.login_user("searcher", "passwordS")
+            # Set searcher to public so they can search.
+            await self.set_public_attribute_of_user(searcher, True, tokenS)
+
+            # Search for all users using searcher's token.
+            users = await self.search_users("publicUser", tokenS)
+
+            # Expect both the explicitly public and the missing attribute user to appear.
+            self.assertIn(publicUser, users)
+
+            users = await self.search_users("filterUser", tokenS)
+            self.assertIn(filterUser, users)
+
+            # Clean up
+            if server_process is not None:
+                server_process.terminate()
+                server_process.wait()
+            if stdout_thread is not None:
+                stdout_thread.join()
+            if stderr_thread is not None:
+                stderr_thread.join()
+            if synapse_dir is not None:
+                shutil.rmtree(synapse_dir)
+        except Exception as e:
+            if server_process is not None:
+                server_process.terminate()
+                server_process.wait()
+            if stdout_thread is not None:
+                stdout_thread.join()
+            if stderr_thread is not None:
+                stderr_thread.join()
+            if synapse_dir is not None:
+                shutil.rmtree(synapse_dir)
+            raise e
+
+    async def test_cannot_search_for_self(self) -> None:
+        synapse_dir = None
+        server_process = None
+        stdout_thread = None
+        stderr_thread = None
+        try:
+            (synapse_dir, config_path, server_process, stdout_thread, stderr_thread) = (
+                await self.start_test_synapse()
+            )
+
+            # Register and login a user.
+            await self.register_user(
+                config_path, synapse_dir, "selfUser", "passwordSelf", False
+            )
+            (selfUser, tokenSelf) = await self.login_user("selfUser", "passwordSelf")
+            # Optionally, set the public attribute to True.
+            await self.set_public_attribute_of_user(selfUser, True, tokenSelf)
+
+            # Search for the user using their own token.
+            results = await self.search_users("selfUser", tokenSelf)
+            # Assert that the result does not include the user's own id.
+            self.assertNotIn(selfUser, results)
+
+            # Clean up
+            if server_process is not None:
+                server_process.terminate()
+                server_process.wait()
+            if stdout_thread is not None:
+                stdout_thread.join()
+            if stderr_thread is not None:
+                stderr_thread.join()
+            if synapse_dir is not None:
+                import shutil
+
+                shutil.rmtree(synapse_dir)
+        except Exception as e:
+            if server_process is not None:
+                server_process.terminate()
+                server_process.wait()
+            if stdout_thread is not None:
+                stdout_thread.join()
+            if stderr_thread is not None:
+                stderr_thread.join()
+            if synapse_dir is not None:
+                import shutil
+
                 shutil.rmtree(synapse_dir)
             raise e
