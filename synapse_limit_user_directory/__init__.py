@@ -136,7 +136,6 @@ class SynapseLimitUserDirectory:
         )
         # if any shared room exists then allow the user (do not filter)
         if len(rows) > 0:
-            logger.info(rows)
             return False
 
         # otherwise filter the user since they do not share any room with the requester
