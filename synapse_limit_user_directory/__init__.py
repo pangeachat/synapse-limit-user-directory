@@ -116,9 +116,9 @@ class SynapseLimitUserDirectory:
         elif isinstance(global_data, bool):
             is_public = global_data
         else:
-            # Should be unreachable, so we log a warning and exclude the user
+            # Should be unreachable, so we log a warning and consider the data missing
             logger.warning(f"Unexpected type for public attribute: {type(global_data)}")
-            is_public = False
+            return self._config.filter_search_if_missing_public_attribute
 
         if is_public:
             return False
@@ -136,6 +136,7 @@ class SynapseLimitUserDirectory:
         )
         # if any shared room exists then allow the user (do not filter)
         if len(rows) > 0:
+            logger.info(rows)
             return False
 
         # otherwise filter the user since they do not share any room with the requester
