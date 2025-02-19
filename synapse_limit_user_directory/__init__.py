@@ -134,7 +134,6 @@ class SynapseLimitUserDirectory:
             query,
             *params,
         )
-        logger.warning(rows)
         # if any shared room exists then allow the user (do not filter)
         if len(rows) > 0:
             return False
