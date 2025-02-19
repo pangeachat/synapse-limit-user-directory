@@ -128,10 +128,10 @@ class SynapseLimitUserDirectory:
             SELECT room_id FROM users_who_share_private_rooms
             WHERE user_id = ? AND other_user_id = ?
             UNION
-            SELECT a.room_id 
-            FROM users_in_public_rooms a 
-            INNER JOIN users_in_public_rooms b 
-            ON a.room_id = b.room_id 
+            SELECT a.room_id
+            FROM users_in_public_rooms a
+            INNER JOIN users_in_public_rooms b
+            ON a.room_id = b.room_id
             WHERE a.user_id = ? AND b.user_id = ?
         """
         params = (requester_id, user_id, requester_id, user_id)
