@@ -1,6 +1,6 @@
 [project]
 name = "synapse_limit_user_directory"
-description = "Limit user directory from returning users <18 years "
+description = "Limit user directory search result to those set their profile to public or they shared a private room"
 readme = "README.md"
 
 version = "0.0.1"

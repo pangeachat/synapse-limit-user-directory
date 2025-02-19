@@ -57,6 +57,7 @@ class TestE2E(aiounittest.AsyncTestCase):
                     },
                 }
             ]
+            config["user_directory"] = {"search_all_users": True}
             config["rc_login"] = {
                 "address": {"per_second": 9999, "burst_count": 9999},
             }
@@ -365,6 +366,10 @@ class TestE2E(aiounittest.AsyncTestCase):
                 json=invite_payload,
             )
             self.assertEqual(response.status_code, 200)
+
+            # Search for userB as userA; at this point they should not appear in the results.
+            users = await self.search_users("userB", tokenA)
+            self.assertNotIn(userB, users)
 
             # userB joins the room.
             join_url = f"http://localhost:8008/_matrix/client/v3/join/{room_id}"
