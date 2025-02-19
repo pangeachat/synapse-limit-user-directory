@@ -123,17 +123,26 @@ class SynapseLimitUserDirectory:
         if is_public:
             return False
 
-        # search if requester shares a room with the requestee
-        query = """
+        # search if requester shares any room (private or public) with the requestee
+        shared_rooms_query = """
             SELECT room_id FROM users_who_share_private_rooms
             WHERE user_id = ? AND other_user_id = ?
+            UNION
+            SELECT a.room_id 
+            FROM users_in_public_rooms a 
+            INNER JOIN users_in_public_rooms b 
+            ON a.room_id = b.room_id 
+            WHERE a.user_id = ? AND b.user_id = ?
         """
-        params = (requester_id, user_id)
+        params = (requester_id, user_id, requester_id, user_id)
+
+        # Check both private and public rooms in one query
         rows = await self.room_store.db_pool.execute(
             "get_shared_rooms",
-            query,
+            shared_rooms_query,
             *params,
         )
+
         # if any shared room exists then allow the user (do not filter)
         if len(rows) > 0:
             return False
